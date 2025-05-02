@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 const priorityColors = {
@@ -7,8 +7,6 @@ const priorityColors = {
   Média: 'bg-yellow-100 text-yellow-800 border-yellow-400',
   Baixa: 'bg-green-100 text-green-800 border-green-400'
 };
-
-const COLORS = ['#8884d8', '#82ca9d', '#ffc658'];
 
 function PriorityBadge({ priority }) {
   return (
@@ -29,15 +27,41 @@ function createEntryPage({ storageKey, title, description, placeholder, showPrio
     const [filterPriority, setFilterPriority] = useState('all');
     const [sortKey, setSortKey] = useState('createdAt');
     const [filteredEntries, setFilteredEntries] = useState([]);
+    const [filtersActive, setFiltersActive] = useState(false); // Novo estado para controlar filtros
+    const isInitialLoad = useRef(true); // Adicionado para controlar a carga inicial
 
-    useEffect(() => {
-      const stored = JSON.parse(localStorage.getItem(storageKey)) || [];
-      setEntries(stored);
-    }, []);
+  useEffect(() => {
+      try {
+        const stored = JSON.parse(localStorage.getItem(storageKey)) || [];
+        console.log("Carregado do localStorage:", stored);
+        setEntries(stored);
+        setFilteredEntries(stored);
+      } catch (error) {
+        console.error("Erro ao carregar do localStorage:", error);
+      }
+    }, [storageKey]);
 
+    // Sincroniza os dados com o localStorage sempre que `entries` mudar
     useEffect(() => {
-      localStorage.setItem(storageKey, JSON.stringify(entries));
-    }, [entries]);
+      if (isInitialLoad.current) {
+        isInitialLoad.current = false; // Marca que a carga inicial já foi feita
+        return;
+      }
+
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(entries));
+        console.log("Salvo no localStorage:", entries);
+      } catch (error) {
+        console.error("Erro ao salvar no localStorage:", error);
+      }
+    }, [entries, storageKey]);
+
+ // Atualiza filteredEntries automaticamente quando entries muda e os filtros não estão ativos
+    useEffect(() => {
+      if (!filtersActive) {
+        setFilteredEntries(entries);
+      }
+    }, [entries, filtersActive]);
 
     const addEntry = () => {
       if (!input.trim()) return;
@@ -65,12 +89,6 @@ function createEntryPage({ storageKey, title, description, placeholder, showPrio
 
     const deleteEntry = index => {
       const updated = entries.filter((_, i) => i !== index);
-      setEntries(updated);
-    };
-
-    const editEntry = (index, newText) => {
-      const updated = [...entries];
-      updated[index].text = newText;
       setEntries(updated);
     };
 
@@ -111,7 +129,18 @@ function createEntryPage({ storageKey, title, description, placeholder, showPrio
           return 0;
         });
       setFilteredEntries(filtered);
+      setFiltersActive(true);
     };
+
+     const clearFilters = () => {
+      setSearch('');
+      setFilterDone('all');
+      setFilterPriority('all');
+      setSortKey('createdAt');
+      setFilteredEntries(entries); // Restaura todas as entradas
+      setFiltersActive(false); // Desativa os filtros
+    };
+    
 
     const completedCount = entries.filter(e => e.done).length;
     const percentComplete = Math.round((completedCount / entries.length) * 100 || 0);
@@ -145,36 +174,105 @@ function createEntryPage({ storageKey, title, description, placeholder, showPrio
                 <option value="priority">Por Prioridade</option>
               </select>
               <button onClick={applyFilters} className="px-4 py-2 bg-blue-600 text-white rounded">Filtrar</button>
+               {filtersActive && (
+                <button
+                  onClick={clearFilters}
+                  className="px-4 py-2 bg-red-600 text-white rounded"
+                >
+                  Desativar Filtros
+                </button>
+              )}
             </div>
           </div>
 
           {/* Bloco de novo item */}
-          <div className="bg-white dark:bg-slate-800 p-4 rounded shadow mb-4">
-            <div className="flex flex-wrap gap-2">
-              <input className="flex-1 p-2 border rounded placeholder-gray-400 text-gray-600" placeholder={placeholder} value={input} onChange={e => setInput(e.target.value)} />
-              {showDeadline && <input type="date" className="p-2 border rounded text-gray-600" value={deadline} onChange={(e) => setDeadline(e.target.value)} />}
-              <button onClick={addEntry} className="px-4 py-2 bg-blue-600 text-white rounded">Adicionar</button>
-            </div>
+<div className="bg-white dark:bg-slate-800 p-4 rounded shadow mb-4">
+  <div className="flex flex-wrap gap-2">
+    {/* Adicione label para o input */}
+    <label htmlFor="new-entry" className="block text-gray-700 dark:text-gray-300 font-medium">
+      📝 Nova Tarefa
+    </label>
+    <input
+      id="new-entry"
+      className="flex-1 p-2 border rounded placeholder-gray-400 text-gray-600"
+      placeholder={`${placeholder} ✍️`}
+      value={input}
+      onChange={e => setInput(e.target.value)}
+    />
+    {showDeadline && (
+      <>
+        <label htmlFor="deadline" className="block text-gray-700 dark:text-gray-300 font-medium">
+          📅 Prazo
+        </label>
+        <input
+          id="deadline"
+          type="date"
+          className="p-2 border rounded text-gray-600"
+          value={deadline}
+          onChange={e => setDeadline(e.target.value)}
+        />
+      </>
+    )}
 
-            {/* Adicionando os inputs de Prioridade, Tipo e Área */}
-            <div className="flex flex-wrap gap-2 mt-4">
-              <select value={priority} onChange={e => setPriority(e.target.value)} className="p-2 border rounded text-gray-700 w-full">
-                <option value="Alta">Alta</option>
-                <option value="Média">Média</option>
-                <option value="Baixa">Baixa</option>
-              </select>
-              <select value={type} onChange={e => setType(e.target.value)} className="p-2 border rounded text-gray-700 w-full">
-                <option value="Mental">Mental</option>
-                <option value="Físico">Físico</option>
-                <option value="Emocional">Emocional</option>
-              </select>
-              <select value={area} onChange={e => setArea(e.target.value)} className="p-2 border rounded text-gray-700 w-full">
-                <option value="Pessoal">Pessoal</option>
-                <option value="Profissional">Profissional</option>
-                <option value="Social">Social</option>
-              </select>
-            </div>
-          </div>
+  </div>
+
+  {/* Inputs para Prioridade, Tipo e Área */}
+  <div className="flex flex-wrap gap-2 mt-4">
+   {showPriority &&
+   <>
+    <label htmlFor="priority" className="block text-gray-700 dark:text-gray-300 font-medium">
+      🚦 Prioridade
+    </label>
+    <select
+      id="priority"
+      value={priority}
+      onChange={e => setPriority(e.target.value)}
+      className="p-2 border rounded text-gray-700 w-full"
+    >
+      <option value="Alta">🔥 Alta</option>
+      <option value="Média">⚖️ Média</option>
+      <option value="Baixa">🌱 Baixa</option>
+    </select>
+  </>}
+    {showType && (
+      <>
+        <label htmlFor="type" className="block text-gray-700 dark:text-gray-300 font-medium">
+          🧠 Tipo
+        </label>
+        <select
+          id="type"
+          value={type}
+          onChange={e => setType(e.target.value)}
+          className="p-2 border rounded text-gray-700 w-full"
+        >
+          <option value="Mental">🧠 Mental</option>
+          <option value="Físico">🏋️ Físico</option>
+          <option value="Emocional">💖 Emocional</option>
+        </select>
+      </>
+    )}
+
+    <label htmlFor="area" className="block text-gray-700 dark:text-gray-300 font-medium">
+      🌍 Área
+    </label>
+    <select
+      id="area"
+      value={area}
+      onChange={e => setArea(e.target.value)}
+      className="p-2 border rounded text-gray-700 w-full"
+    >
+      <option value="Pessoal">👤 Pessoal</option>
+      <option value="Profissional">💼 Profissional</option>
+      <option value="Social">🌐 Social</option>
+    </select>
+      {/* Botão Adicionar no final */}
+  <div className="mt-4">
+    <button onClick={addEntry} className="w-full px-4 py-2 bg-blue-600 text-white rounded">
+      ➕ Adicionar
+    </button>
+  </div>
+  </div>
+</div>
 
           <div className="flex gap-4 text-sm text-gray-500 dark:text-gray-400">
             <button onClick={exportEntries}>⬇️ Exportar</button>
@@ -222,14 +320,37 @@ function createEntryPage({ storageKey, title, description, placeholder, showPrio
   };
 }
 
-const KnowYourself = createEntryPage({ storageKey: 'knowYourselfEntries', title: '🧬 Conheça-se', description: 'Reflita sobre o que te limita e onde você pode crescer.', placeholder: 'Descreva uma limitação ou situação marcante' });
-const Accountability = createEntryPage({ storageKey: 'accountabilityGoals', title: '🎯 Responsabilidade e Metas', description: 'Liste metas reais com prazos e cumpra-as com disciplina.', placeholder: 'Meta concreta e objetiva', showDeadline: true });
-const Discipline = createEntryPage({ storageKey: 'disciplineTasks', title: '🏋️ Disciplina Diária', description: 'Registre pequenas ações desconfortáveis para sair da zona de conforto.', placeholder: 'Tarefa desconfortável para hoje', showPriority: true });
+const KnowYourself = createEntryPage({ storageKey: 'knowYourselfEntries', title: '🧬 Conheça-se', description: 'Reflita sobre o que te limita e onde você pode crescer.', placeholder: 'Descreva uma limitação ou situação marcante', showType: true  });
+const Accountability = createEntryPage({ storageKey: 'accountabilityGoals', title: '🎯 Responsabilidade e Metas', description: 'Liste metas reais com prazos e cumpra-as com disciplina.', placeholder: 'Meta concreta e objetiva', showType: true ,showDeadline: true });
+const Discipline = createEntryPage({ storageKey: 'disciplineTasks', title: '🏋️ Disciplina Diária', description: 'Registre pequenas ações desconfortáveis para sair da zona de conforto.', placeholder: 'Tarefa desconfortável para hoje',showType: true , showPriority: true });
 const ToughMind = createEntryPage({ storageKey: 'toughMindEntries', title: '🧠 Mente Calejada', description: 'Visualize desafios e recorde vitórias para fortalecer sua mente.', placeholder: 'Visualização ou vitória marcante', showType: true });
 const BeRare = createEntryPage({ storageKey: 'beRareEntries', title: '💎 Seja Raro', description: 'Defina onde você se tornará verdadeiramente raro entre os raros.', placeholder: 'Área onde será excepcional', showType: true });
 
 const pages = [
-  { path: '/', label: 'Início', component: () => <div className="text-center p-8"><h1 className="text-4xl font-bold">Desafios "Can't Hurt Me"</h1><p className="text-gray-600 mt-2">Escolha um desafio e comece sua jornada.</p></div> },
+  { path: '/', label: 'Início', component: () => (
+      <div className="text-center p-8">
+        <h1 className="text-4xl font-bold">Desafios "Can't Hurt Me"</h1>
+        <p className="text-gray-600 mt-2">Escolha um desafio e comece sua jornada.</p>
+        <div className="mt-6 space-y-4">
+          <Link to="/conheca-se" className="block text-blue-600 hover:underline">
+            🧬 Conheça-se - Reflita sobre o que te limita e onde você pode crescer.
+          </Link>
+          <Link to="/responsabilidade" className="block text-blue-600 hover:underline">
+            🎯 Responsabilidade e Metas - Liste metas reais com prazos e cumpra-as com disciplina.
+          </Link>
+          <Link to="/disciplina" className="block text-blue-600 hover:underline">
+            🏋️ Disciplina Diária - Registre pequenas ações desconfortáveis para sair da zona de conforto.
+          </Link>
+          <Link to="/mente-calejada" className="block text-blue-600 hover:underline">
+            🧠 Mente Calejada - Visualize desafios e recorde vitórias para fortalecer sua mente.
+          </Link>
+          <Link to="/seja-raro" className="block text-blue-600 hover:underline">
+            💎 Seja Raro - Defina onde você se tornará verdadeiramente raro entre os raros.
+          </Link>
+        </div>
+      </div>
+    )
+  },
   { path: '/conheca-se', label: '🧬 Conheça-se', component: KnowYourself },
   { path: '/responsabilidade', label: '🎯 Responsabilidade e Metas', component: Accountability },
   { path: '/disciplina', label: '🏋️ Disciplina Diária', component: Discipline },
@@ -252,11 +373,11 @@ function Header() {
 
 export default function App() {
   return (
-    <Router>
+    <Router >
       <div className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-50 dark:from-slate-900 dark:to-slate-800 text-gray-800 dark:text-white">
         <Header />
         <main className="p-4 max-w-3xl mx-auto space-y-8">
-          <Routes>
+          <Routes EntryPage= 'Início'>
             {pages.map(({ path, component: Component }) => (
               <Route key={path} path={path} element={<Component />} />
             ))}
