@@ -14,6 +14,50 @@ function PriorityBadge({ priority }) {
   );
 }
 
+function SubtaskInput({ onAdd }) {
+  const [subtask, setSubtask] = useState('');
+
+  const handleAdd = () => {
+    if (!subtask.trim()) return;
+    onAdd(subtask);
+    setSubtask('');
+  };
+
+  return (
+    <div className="flex gap-2 mt-2">
+      <input
+        className="flex-1 p-1 border rounded text-sm text-gray-700"
+        placeholder="➕ Nova subtarefa"
+        value={subtask}
+        onChange={(e) => setSubtask(e.target.value)}
+      />
+      <button onClick={handleAdd} className="px-2 py-1 bg-green-500 text-white rounded text-sm">Adicionar</button>
+    </div>
+  );
+}
+
+function CommentInput({ onAdd }) {
+  const [comment, setComment] = useState('');
+
+  const handleAdd = () => {
+    if (!comment.trim()) return;
+    onAdd(comment);
+    setComment('');
+  };
+
+  return (
+    <div className="flex gap-2 mt-2">
+      <input
+        className="flex-1 p-1 border rounded text-sm text-gray-700"
+        placeholder="💬 Adicionar comentário"
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+      />
+      <button onClick={handleAdd} className="px-2 py-1 bg-blue-500 text-white rounded text-sm">Comentar</button>
+    </div>
+  );
+}
+
 function createEntryPage({ storageKey, title, description, placeholder, showPriority = false, showType = false, showDeadline = false }) {
   return function EntryPage() {
     const [entries, setEntries] = useState([]);
@@ -27,13 +71,12 @@ function createEntryPage({ storageKey, title, description, placeholder, showPrio
     const [filterPriority, setFilterPriority] = useState('all');
     const [sortKey, setSortKey] = useState('createdAt');
     const [filteredEntries, setFilteredEntries] = useState([]);
-    const [filtersActive, setFiltersActive] = useState(false); // Novo estado para controlar filtros
-    const isInitialLoad = useRef(true); // Adicionado para controlar a carga inicial
+    const [filtersActive, setFiltersActive] = useState(false);
+    const isInitialLoad = useRef(true);
 
-  useEffect(() => {
+    useEffect(() => {
       try {
         const stored = JSON.parse(localStorage.getItem(storageKey)) || [];
-        console.log("Carregado do localStorage:", stored);
         setEntries(stored);
         setFilteredEntries(stored);
       } catch (error) {
@@ -41,22 +84,18 @@ function createEntryPage({ storageKey, title, description, placeholder, showPrio
       }
     }, [storageKey]);
 
-    // Sincroniza os dados com o localStorage sempre que `entries` mudar
     useEffect(() => {
       if (isInitialLoad.current) {
-        isInitialLoad.current = false; // Marca que a carga inicial já foi feita
+        isInitialLoad.current = false;
         return;
       }
-
       try {
         localStorage.setItem(storageKey, JSON.stringify(entries));
-        console.log("Salvo no localStorage:", entries);
       } catch (error) {
         console.error("Erro ao salvar no localStorage:", error);
       }
     }, [entries, storageKey]);
 
- // Atualiza filteredEntries automaticamente quando entries muda e os filtros não estão ativos
     useEffect(() => {
       if (!filtersActive) {
         setFilteredEntries(entries);
@@ -74,11 +113,32 @@ function createEntryPage({ storageKey, title, description, placeholder, showPrio
           priority,
           type,
           createdAt: new Date().toISOString(),
-          deadline: deadline || null
+          deadline: deadline || null,
+          subtasks: [], // Initialize with an empty array
+          comments: [] // Initialize with an empty array
         }
       ]);
       setInput('');
       setDeadline('');
+    };
+
+    const addSubtask = (index, subtask) => {
+      if (!subtask.trim()) return;
+      const updated = [...entries];
+      updated[index].subtasks.push({ text: subtask, done: false, comments: [] }); // Add comments array
+      setEntries(updated);
+    };
+
+    const toggleSubtaskDone = (entryIndex, subtaskIndex) => {
+      const updated = [...entries];
+      updated[entryIndex].subtasks[subtaskIndex].done = !updated[entryIndex].subtasks[subtaskIndex].done;
+      setEntries(updated);
+    };
+
+    const deleteSubtask = (entryIndex, subtaskIndex) => {
+      const updated = [...entries];
+      updated[entryIndex].subtasks = updated[entryIndex].subtasks.filter((_, i) => i !== subtaskIndex);
+      setEntries(updated);
     };
 
     const toggleDone = index => {
@@ -144,6 +204,18 @@ function createEntryPage({ storageKey, title, description, placeholder, showPrio
 
     const completedCount = entries.filter(e => e.done).length;
     const percentComplete = Math.round((completedCount / entries.length) * 100 || 0);
+
+    const addTaskComment = (index, comment) => {
+      const updated = [...entries];
+      updated[index].comments.push(comment);
+      setEntries(updated);
+    };
+
+    const addSubtaskComment = (taskIndex, subtaskIndex, comment) => {
+      const updated = [...entries];
+      updated[taskIndex].subtasks[subtaskIndex].comments.push(comment);
+      setEntries(updated);
+    };
 
     return (
       <div className="space-y-4">
@@ -295,26 +367,130 @@ function createEntryPage({ storageKey, title, description, placeholder, showPrio
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
+          {/* Progress Bar */}
+          <div className="mt-2">
+            <div className="w-full bg-gray-200 rounded h-2">
+              <div
+                className="bg-blue-500 h-2 rounded"
+                style={{ width: `${percentComplete}%` }}
+              ></div>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">{percentComplete}% concluído</p>
+          </div>
         </div>
 
         <ul className="space-y-2">
-          {filteredEntries.map((entry, i) => (
-            <li key={i} className={`p-3 border rounded dark:border-slate-600 flex flex-col sm:flex-row sm:justify-between sm:items-center ${entry.done ? 'line-through text-gray-500 dark:text-gray-400 bg-white/60 dark:bg-slate-700/60' : 'bg-white/90 dark:bg-slate-700'}`}>
-              <div className="mb-2 sm:mb-0">
-                <p className="font-medium">{entry.text}</p>
-                <p className="text-xs text-gray-500">🕒 Criado em: {new Date(entry.createdAt).toLocaleDateString()}</p>
-                {entry.deadline && <p className="text-xs">🗓 Deadline: {entry.deadline}</p>}
-                {entry.type && <p className="text-xs">🧠 Tipo: {entry.type}</p>}
-                {entry.area && <p className="text-xs">🔵 Área: {entry.area}</p>}
-                {entry.priority && <PriorityBadge priority={entry.priority} />}
+  {filteredEntries.map((entry, i) => {
+    const completedSubtasks = entry.subtasks.filter(subtask => subtask.done).length;
+    const totalSubtasks = entry.subtasks.length;
+    const progress = totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0;
+
+    return (
+      <li
+        key={i}
+        className="p-3 border rounded dark:border-slate-600 bg-white dark:bg-slate-800"
+      >
+        {/* Task Details */}
+        <div className="mb-4">
+          <p className="font-medium">{entry.text}</p>
+          <p className="text-xs text-gray-500">🕒 Criado em: {new Date(entry.createdAt).toLocaleDateString()}</p>
+          {entry.deadline && <p className="text-xs">🗓 Deadline: {entry.deadline}</p>}
+          {entry.type && <p className="text-xs">🧠 Tipo: {entry.type}</p>}
+          {entry.area && <p className="text-xs">🔵 Área: {entry.area}</p>}
+          {entry.priority && <PriorityBadge priority={entry.priority} />}
+        </div>
+
+        {/* Progress Bar */}
+        <div className="mt-2">
+          <div className="w-full bg-gray-200 rounded h-2">
+            <div
+              className="bg-blue-500 h-2 rounded"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">{progress}% concluído</p>
+        </div>
+
+        {/* Task Actions */}
+        <div className="flex gap-2 mb-4">
+          <button onClick={() => toggleDone(i)} className="text-sm text-blue-600">
+            {entry.done ? 'Desfazer' : 'Concluir'}
+          </button>
+          <button onClick={() => deleteEntry(i)} className="text-sm text-red-600">
+            Excluir
+          </button>
+        </div>
+
+        {/* Task Comments */}
+        <div className="mt-4">
+          <h4 className="text-sm font-bold">Comentários:</h4>
+          <ul className="space-y-1">
+            {entry.comments.map((comment, k) => (
+              <li key={k} className="text-sm text-gray-700 dark:text-gray-300">
+                {comment}
+              </li>
+            ))}
+          </ul>
+          <CommentInput onAdd={(comment) => addTaskComment(i, comment)} />
+        </div>
+
+        {/* Subtask Input */}
+        <SubtaskInput onAdd={(subtask) => addSubtask(i, subtask)} />
+
+        {/* Subtask List */}
+        <ul className="mt-4 space-y-2">
+          {entry.subtasks.map((subtask, j) => (
+            <li
+              key={j}
+              className="flex flex-col p-2 border rounded bg-gray-100 dark:bg-slate-700 w-full"
+            >
+              <div className="flex justify-between items-center">
+                <span
+                  className={`flex-1 ${subtask.done ? 'line-through' : ''} break-words`}
+                  style={{
+                    wordWrap: 'break-word',
+                    overflowWrap: 'break-word',
+                    wordBreak: 'break-word',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {subtask.text}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => toggleSubtaskDone(i, j)}
+                    className="text-sm text-blue-600"
+                  >
+                    {subtask.done ? 'Desfazer' : 'Concluir'}
+                  </button>
+                  <button
+                    onClick={() => deleteSubtask(i, j)}
+                    className="text-sm text-red-600"
+                  >
+                    Excluir
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => toggleDone(i)} className="text-sm text-blue-600">{entry.done ? 'Desfazer' : 'Concluir'}</button>
-                <button onClick={() => deleteEntry(i)} className="text-sm text-red-600">Excluir</button>
+
+              {/* Subtask Comments */}
+              <div className="mt-2">
+                <h4 className="text-xs font-bold">Comentários:</h4>
+                <ul className="space-y-1">
+                  {subtask.comments.map((comment, k) => (
+                    <li key={k} className="text-xs text-gray-700 dark:text-gray-300">
+                      {comment}
+                    </li>
+                  ))}
+                </ul>
+                <CommentInput onAdd={(comment) => addSubtaskComment(i, j, comment)} />
               </div>
             </li>
           ))}
         </ul>
+      </li>
+    );
+  })}
+</ul>
       </div>
     );
   };
