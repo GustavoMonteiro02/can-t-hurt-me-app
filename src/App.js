@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 const priorityColors = {
   Alta: 'bg-red-100 text-red-800 border-red-400',
@@ -141,11 +142,35 @@ function createEntryPage({ storageKey, title, description, placeholder, showPrio
       setEntries(updated);
     };
 
-    const toggleDone = index => {
+    const toggleDone = (index) => {
       const updated = [...entries];
-      updated[index].done = !updated[index].done;
+      const task = updated[index];
+    
+      if (task.done) {
+        task.done = false; // Mark as not done
+      } else {
+        task.done = true; // Mark as done
+    
+        // Handle recurring tasks
+        if (task.recurrence && task.recurrence !== 'none') {
+          const newTask = { ...task, done: false, createdAt: new Date().toISOString() };
+    
+          // Adjust the deadline based on the recurrence interval
+          if (task.recurrence === 'daily') {
+            newTask.deadline = new Date(new Date(task.deadline || new Date()).setDate(new Date(task.deadline || new Date()).getDate() + 1)).toISOString().split('T')[0];
+          } else if (task.recurrence === 'weekly') {
+            newTask.deadline = new Date(new Date(task.deadline || new Date()).setDate(new Date(task.deadline || new Date()).getDate() + 7)).toISOString().split('T')[0];
+          } else if (task.recurrence === 'monthly') {
+            newTask.deadline = new Date(new Date(task.deadline || new Date()).setMonth(new Date(task.deadline || new Date()).getMonth() + 1)).toISOString().split('T')[0];
+          }
+    
+          updated.push(newTask); // Add the new recurring task
+        }
+      }
+    
       setEntries(updated);
     };
+    
 
     const deleteEntry = index => {
       const updated = entries.filter((_, i) => i !== index);
@@ -215,6 +240,28 @@ function createEntryPage({ storageKey, title, description, placeholder, showPrio
       const updated = [...entries];
       updated[taskIndex].subtasks[subtaskIndex].comments.push(comment);
       setEntries(updated);
+    };
+
+    const onDragEnd = (result) => {
+      const { source, destination, type } = result;
+    
+      if (!destination) return; // If dropped outside a valid area, do nothing
+    
+      if (type === 'task') {
+        const reorderedTasks = Array.from(entries);
+        const [movedTask] = reorderedTasks.splice(source.index, 1);
+        reorderedTasks.splice(destination.index, 0, movedTask);
+        setEntries(reorderedTasks);
+      } else if (type === 'subtask') {
+        const taskIndex = source.droppableId.split('-')[1];
+        const reorderedSubtasks = Array.from(entries[taskIndex].subtasks);
+        const [movedSubtask] = reorderedSubtasks.splice(source.index, 1);
+        reorderedSubtasks.splice(destination.index, 0, movedSubtask);
+    
+        const updatedEntries = [...entries];
+        updatedEntries[taskIndex].subtasks = reorderedSubtasks;
+        setEntries(updatedEntries);
+      }
     };
 
     return (
@@ -379,118 +426,142 @@ function createEntryPage({ storageKey, title, description, placeholder, showPrio
           </div>
         </div>
 
-        <ul className="space-y-2">
-  {filteredEntries.map((entry, i) => {
-    const completedSubtasks = entry.subtasks.filter(subtask => subtask.done).length;
-    const totalSubtasks = entry.subtasks.length;
-    const progress = totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0;
+        <DragDropContext onDragEnd={onDragEnd}>
+          <Droppable droppableId="tasks" type="task">
+            {(provided) => (
+              <ul className="space-y-2" {...provided.droppableProps} ref={provided.innerRef}>
+                {filteredEntries.map((entry, i) => {
+                  const completedSubtasks = entry.subtasks.filter(subtask => subtask.done).length;
+                  const totalSubtasks = entry.subtasks.length;
+                  const progress = totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0;
 
-    return (
-      <li
-        key={i}
-        className="p-3 border rounded dark:border-slate-600 bg-white dark:bg-slate-800"
-      >
-        {/* Task Details */}
-        <div className="mb-4">
-          <p className="font-medium">{entry.text}</p>
-          <p className="text-xs text-gray-500">🕒 Criado em: {new Date(entry.createdAt).toLocaleDateString()}</p>
-          {entry.deadline && <p className="text-xs">🗓 Deadline: {entry.deadline}</p>}
-          {entry.type && <p className="text-xs">🧠 Tipo: {entry.type}</p>}
-          {entry.area && <p className="text-xs">🔵 Área: {entry.area}</p>}
-          {entry.priority && <PriorityBadge priority={entry.priority} />}
-        </div>
+                  return (
+                    <Draggable key={entry.text} draggableId={`task-${i}`} index={i}>
+                      {(provided) => (
+                        <li
+                          className="p-3 border rounded dark:border-slate-600 bg-white dark:bg-slate-800"
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                        >
+                          {/* Task Details */}
+                          <div className="mb-4">
+                            <p className="font-medium">{entry.text}</p>
+                            <p className="text-xs text-gray-500">🕒 Criado em: {new Date(entry.createdAt).toLocaleDateString()}</p>
+                            {entry.deadline && <p className="text-xs">🗓 Deadline: {entry.deadline}</p>}
+                            {entry.type && <p className="text-xs">🧠 Tipo: {entry.type}</p>}
+                            {entry.area && <p className="text-xs">🔵 Área: {entry.area}</p>}
+                            {entry.priority && <PriorityBadge priority={entry.priority} />}
+                          </div>
 
-        {/* Progress Bar */}
-        <div className="mt-2">
-          <div className="w-full bg-gray-200 rounded h-2">
-            <div
-              className="bg-blue-500 h-2 rounded"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-          <p className="text-xs text-gray-500 mt-1">{progress}% concluído</p>
-        </div>
+                          {/* Progress Bar */}
+                          <div className="mt-2">
+                            <div className="w-full bg-gray-200 rounded h-2">
+                              <div
+                                className="bg-blue-500 h-2 rounded"
+                                style={{ width: `${progress}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">{progress}% concluído</p>
+                          </div>
 
-        {/* Task Actions */}
-        <div className="flex gap-2 mb-4">
-          <button onClick={() => toggleDone(i)} className="text-sm text-blue-600">
-            {entry.done ? 'Desfazer' : 'Concluir'}
-          </button>
-          <button onClick={() => deleteEntry(i)} className="text-sm text-red-600">
-            Excluir
-          </button>
-        </div>
+                          {/* Task Actions */}
+                          <div className="flex gap-2 mb-4">
+                            <button onClick={() => toggleDone(i)} className="text-sm text-blue-600">
+                              {entry.done ? 'Desfazer' : 'Concluir'}
+                            </button>
+                            <button onClick={() => deleteEntry(i)} className="text-sm text-red-600">
+                              Excluir
+                            </button>
+                          </div>
 
-        {/* Task Comments */}
-        <div className="mt-4">
-          <h4 className="text-sm font-bold">Comentários:</h4>
-          <ul className="space-y-1">
-            {entry.comments.map((comment, k) => (
-              <li key={k} className="text-sm text-gray-700 dark:text-gray-300">
-                {comment}
-              </li>
-            ))}
-          </ul>
-          <CommentInput onAdd={(comment) => addTaskComment(i, comment)} />
-        </div>
+                          {/* Task Comments */}
+                          <div className="mt-4">
+                            <h4 className="text-sm font-bold">Comentários:</h4>
+                            <ul className="space-y-1">
+                              {entry.comments.map((comment, k) => (
+                                <li key={k} className="text-sm text-gray-700 dark:text-gray-300">
+                                  {comment}
+                                </li>
+                              ))}
+                            </ul>
+                            <CommentInput onAdd={(comment) => addTaskComment(i, comment)} />
+                          </div>
 
-        {/* Subtask Input */}
-        <SubtaskInput onAdd={(subtask) => addSubtask(i, subtask)} />
+                          {/* Subtask Input */}
+                          <SubtaskInput onAdd={(subtask) => addSubtask(i, subtask)} />
 
-        {/* Subtask List */}
-        <ul className="mt-4 space-y-2">
-          {entry.subtasks.map((subtask, j) => (
-            <li
-              key={j}
-              className="flex flex-col p-2 border rounded bg-gray-100 dark:bg-slate-700 w-full"
-            >
-              <div className="flex justify-between items-center">
-                <span
-                  className={`flex-1 ${subtask.done ? 'line-through' : ''} break-words`}
-                  style={{
-                    wordWrap: 'break-word',
-                    overflowWrap: 'break-word',
-                    wordBreak: 'break-word',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {subtask.text}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => toggleSubtaskDone(i, j)}
-                    className="text-sm text-blue-600"
-                  >
-                    {subtask.done ? 'Desfazer' : 'Concluir'}
-                  </button>
-                  <button
-                    onClick={() => deleteSubtask(i, j)}
-                    className="text-sm text-red-600"
-                  >
-                    Excluir
-                  </button>
-                </div>
-              </div>
+                          {/* Subtask List */}
+                          <Droppable droppableId={`subtasks-${i}`} type="subtask">
+                            {(provided) => (
+                              <ul className="mt-4 space-y-2" {...provided.droppableProps} ref={provided.innerRef}>
+                                {entry.subtasks.map((subtask, j) => (
+                                  <Draggable key={subtask.text} draggableId={`subtask-${i}-${j}`} index={j}>
+                                    {(provided) => (
+                                      <li
+                                        className="flex flex-col p-2 border rounded bg-gray-100 dark:bg-slate-700 w-full"
+                                        ref={provided.innerRef}
+                                        {...provided.draggableProps}
+                                        {...provided.dragHandleProps}
+                                      >
+                                        <div className="flex justify-between items-center">
+                                          <span
+                                            className={`flex-1 ${subtask.done ? 'line-through' : ''} break-words`}
+                                            style={{
+                                              wordWrap: 'break-word',
+                                              overflowWrap: 'break-word',
+                                              wordBreak: 'break-word',
+                                              overflow: 'hidden',
+                                            }}
+                                          >
+                                            {subtask.text}
+                                          </span>
+                                          <div className="flex gap-2">
+                                            <button
+                                              onClick={() => toggleSubtaskDone(i, j)}
+                                              className="text-sm text-blue-600"
+                                            >
+                                              {subtask.done ? 'Desfazer' : 'Concluir'}
+                                            </button>
+                                            <button
+                                              onClick={() => deleteSubtask(i, j)}
+                                              className="text-sm text-red-600"
+                                            >
+                                              Excluir
+                                            </button>
+                                          </div>
 
-              {/* Subtask Comments */}
-              <div className="mt-2">
-                <h4 className="text-xs font-bold">Comentários:</h4>
-                <ul className="space-y-1">
-                  {subtask.comments.map((comment, k) => (
-                    <li key={k} className="text-xs text-gray-700 dark:text-gray-300">
-                      {comment}
-                    </li>
-                  ))}
-                </ul>
-                <CommentInput onAdd={(comment) => addSubtaskComment(i, j, comment)} />
-              </div>
-            </li>
-          ))}
-        </ul>
-      </li>
-    );
-  })}
-</ul>
+                                          {/* Subtask Comments */}
+                                          <div className="mt-2">
+                                            <h4 className="text-xs font-bold">Comentários:</h4>
+                                            <ul className="space-y-1">
+                                              {subtask.comments.map((comment, k) => (
+                                                <li key={k} className="text-xs text-gray-700 dark:text-gray-300">
+                                                  {comment}
+                                                </li>
+                                              ))}
+                                            </ul>
+                                            <CommentInput onAdd={(comment) => addSubtaskComment(i, j, comment)} />
+                                          </div>
+                                        </div>
+                                      </li>
+                                    )}
+                                  </Draggable>
+                                ))}
+                                {provided.placeholder}
+                              </ul>
+                            )}
+                          </Droppable>
+                        </li>
+                      )}
+                    </Draggable>
+                  );
+                })}
+                {provided.placeholder}
+              </ul>
+            )}
+          </Droppable>
+        </DragDropContext>
       </div>
     );
   };
