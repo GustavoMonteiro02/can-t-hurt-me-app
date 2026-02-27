@@ -1,70 +1,97 @@
-# Getting Started with Create React App
+# Can't Hurt Me — Challenge Tracker (React)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A simple browser-only app to track **uncomfortable challenges**, **daily discipline tasks**, and **goals with deadlines** — inspired by the *Can't Hurt Me* mindset.
 
-## Available Scripts
+Everything is stored locally in your browser (**localStorage**). You can also **export/import** your data as JSON.
 
-In the project directory, you can run:
+---
 
-### `npm start`
+## Features
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- 5 pages (one per “chapter/area”) with dedicated lists
+- Add items with:
+  - **Área**: Pessoal / Profissional / Social
+  - **Tipo**: Mental / Físico / Emocional
+  - **Prioridade** (only on *Disciplina Diária*): Alta / Média / Baixa
+  - **Prazo** (only on *Responsabilidade e Metas*)
+- Mark as **Concluir / Desfazer**
+- **Search + filters + sorting**
+  - Filter by: done status and priority
+  - Sort by: newest, deadline, or priority
+- **Progress**: completed count + % (and chart UI)
+- **Export / Import JSON** (easy backup/restore)
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+---
 
-### `npm test`
+## Routes / Pages
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- `/` — Início
+- `/conheca-se` — Conheça-se
+- `/responsabilidade` — Responsabilidade e Metas
+- `/disciplina` — Disciplina Diária
+- `/mente-calejada` — Mente Calejada
+- `/seja-raro` — Seja Raro
 
-### `npm run build`
+---
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Tech Stack
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- React (Create React App / `react-scripts`)
+- React Router
+- Tailwind CSS
+- Recharts
+- Browser localStorage
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+---
 
-### `npm run eject`
+## Getting Started
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### Prerequisites
+- Node.js (LTS recommended)
+- npm
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Install
+```bash
+npm install
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Run (dev)
+```bash
+npm start
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Open:
+- http://localhost:3000
 
-## Learn More
+### Build
+```bash
+npm run build
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+---
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Data Storage (localStorage keys)
 
-### Code Splitting
+Each page saves to its own key:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+- `knowYourselfEntries`
+- `accountabilityGoals`
+- `disciplineTasks`
+- `toughMindEntries`
+- `beRareEntries`
 
-### Analyzing the Bundle Size
+Export downloads a file named like `<storageKey>.json` and import expects a valid JSON array.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+---
 
-### Making a Progressive Web App
+## Disclaimer
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+This is a personal productivity project inspired by the themes in *Can't Hurt Me*.  
+Not affiliated with David Goggins or the book’s publishers.
 
-### Advanced Configuration
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+## License
 
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+No license has been added yet.
+If you want it to be open-source friendly, consider adding an MIT License.
